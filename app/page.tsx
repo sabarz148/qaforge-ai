@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
+import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 
 type PreviewImage = {
   name: string;
@@ -10,12 +11,39 @@ type PreviewImage = {
 };
 
 export default function Home() {
+  const { isSignedIn, user } = useUser();
+
   const [type, setType] = useState("manual");
   const [input, setInput] = useState("");
   const [images, setImages] = useState<PreviewImage[]>([]);
   const [output, setOutput] = useState("");
   const [tableData, setTableData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const plan = (user?.publicMetadata?.plan as string) || "free";
+  const isPro = plan === "pro" || plan === "premium";
+
+  function todayKey() {
+    const today = new Date().toISOString().slice(0, 10);
+    return `qaforge_usage_${user?.id || "guest"}_${today}`;
+  }
+
+  function getUsage() {
+    if (typeof window === "undefined") return 0;
+    return Number(localStorage.getItem(todayKey()) || "0");
+  }
+
+  function incrementUsage() {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(todayKey(), String(getUsage() + 1));
+  }
+
+  function clearAll() {
+    setInput("");
+    setImages([]);
+    setOutput("");
+    setTableData([]);
+  }
 
   async function resizeImage(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -29,8 +57,8 @@ export default function Home() {
       img.onload = () => {
         const maxWidth = 800;
         const scale = Math.min(maxWidth / img.width, 1);
-        const canvas = document.createElement("canvas");
 
+        const canvas = document.createElement("canvas");
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
 
@@ -47,6 +75,16 @@ export default function Home() {
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!isSignedIn) {
+      setOutput("Please sign in to upload screenshots.");
+      return;
+    }
+
+    if (!isPro) {
+      setOutput("Screenshot analysis is available in Pro plan only.");
+      return;
+    }
+
     const files = Array.from(e.target.files || []);
 
     if (files.length + images.length > 5) {
@@ -79,6 +117,26 @@ export default function Home() {
   }
 
   async function generate() {
+    if (!isSignedIn) {
+      setOutput("Please sign in to generate QA output.");
+      return;
+    }
+
+    if (!isPro && getUsage() >= 3) {
+      setOutput("Free limit reached: 3 generations per day. Upgrade to Pro for more usage.");
+      return;
+    }
+
+    if (!isPro && images.length > 0) {
+      setOutput("Screenshot analysis is Pro only.");
+      return;
+    }
+
+    if (!isPro && (type === "playwright" || type === "api-automation")) {
+      setOutput("Automation code generation is Pro only.");
+      return;
+    }
+
     if (!input.trim() && images.length === 0) {
       setOutput("Please enter details or upload screenshots.");
       return;
@@ -106,12 +164,14 @@ export default function Home() {
 
       if (type === "playwright" || type === "api-automation") {
         setOutput(cleaned);
+        incrementUsage();
         return;
       }
 
       const parsed = JSON.parse(cleaned);
       setTableData(parsed);
       setOutput(JSON.stringify(parsed, null, 2));
+      incrementUsage();
     } catch {
       setOutput("Error: Could not process AI response. Try again.");
     } finally {
@@ -192,11 +252,6 @@ export default function Home() {
 ## 1. Install Playwright
 npm init playwright@latest
 
-Choose:
-- TypeScript: Yes
-- Tests folder: tests
-- Install browsers: Yes
-
 ## 2. Add Generated Code
 Create this file:
 tests/ai-generated.spec.ts
@@ -247,22 +302,32 @@ npx playwright test --debug
             </div>
           </div>
 
-          <div style={badgeStyle}>Built for QA teams, freelancers & startups</div>
+          <div style={authArea}>
+            <div style={badgeStyle}>
+              {isSignedIn ? `${isPro ? "Pro" : "Free"} Plan • ${isPro ? "50" : "3"} daily generations` : "Sign in to start"}
+            </div>
+
+            {isSignedIn ? (
+              <UserButton />
+            ) : (
+              <SignInButton mode="modal">
+                <button style={signInButton}>Sign In</button>
+              </SignInButton>
+            )}
+          </div>
         </header>
 
         <section style={heroStyle}>
-          <div>
-            <h1 style={heroTitle}>Generate QA test cases and automation in minutes.</h1>
-            <p style={heroText}>
-              Create manual test cases, API test cases, Playwright UI automation, and API automation from feature text or app screenshots.
-            </p>
+          <h1 style={heroTitle}>Generate QA test cases and automation in minutes.</h1>
+          <p style={heroText}>
+            Create manual test cases, API test cases, Playwright UI automation, and API automation from feature text or app screenshots.
+          </p>
 
-            <div style={heroBullets}>
-              <span>✓ Excel / PDF export</span>
-              <span>✓ Screenshot analysis</span>
-              <span>✓ Playwright code</span>
-              <span>✓ API test coverage</span>
-            </div>
+          <div style={heroBullets}>
+            <span>✓ Excel / PDF export</span>
+            <span>✓ Screenshot analysis</span>
+            <span>✓ Playwright code</span>
+            <span>✓ API test coverage</span>
           </div>
         </section>
 
@@ -270,7 +335,7 @@ npx playwright test --debug
           <h2 style={{ marginTop: 0 }}>How it works</h2>
           <div style={stepsGrid}>
             <div style={stepCard}><b>1. Describe</b><br />Enter your feature, API, flow, or URL details.</div>
-            <div style={stepCard}><b>2. Upload</b><br />Add up to 5 app screenshots for UI-based test cases.</div>
+            <div style={stepCard}><b>2. Upload</b><br />Add screenshots for UI-based test cases. Pro only.</div>
             <div style={stepCard}><b>3. Generate</b><br />AI creates structured test cases or Playwright code.</div>
             <div style={stepCard}><b>4. Export</b><br />Download Excel, PDF, TXT, or runnable automation files.</div>
           </div>
@@ -293,9 +358,11 @@ npx playwright test --debug
                     ...tabButton,
                     background: type === value ? "#22c55e" : "#1e293b",
                     color: "white",
+                    opacity: !isPro && (value === "playwright" || value === "api-automation") ? 0.55 : 1,
                   }}
                 >
                   {label}
+                  {!isPro && (value === "playwright" || value === "api-automation") ? " 🔒" : ""}
                 </button>
               ))}
             </div>
@@ -316,17 +383,18 @@ npx playwright test --debug
             />
 
             <div style={uploadBox}>
-              <h3 style={{ marginTop: 0 }}>Upload app screenshots</h3>
+              <h3 style={{ marginTop: 0 }}>Upload app screenshots {isPro ? "" : "🔒"}</h3>
 
               <p style={{ color: "#94a3b8", fontSize: "14px" }}>
-                Upload up to 5 clear screenshots. Images are resized to 800px width and compressed to reduce cost.
+                Pro feature. Upload up to 5 clear screenshots. Images are resized to 800px width and compressed to reduce cost.
               </p>
 
-              <label style={uploadButton}>
+              <label style={{ ...uploadButton, opacity: isPro ? 1 : 0.5 }}>
                 Select Screenshots
                 <input
                   type="file"
                   multiple
+                  disabled={!isPro}
                   accept="image/png,image/jpeg,image/jpg,image/webp"
                   onChange={handleImageUpload}
                   style={{ display: "none" }}
@@ -352,9 +420,15 @@ npx playwright test --debug
               )}
             </div>
 
-            <button onClick={generate} disabled={loading} style={generateButton}>
-              {loading ? "Generating..." : "Generate QA Output"}
-            </button>
+            <div style={{ display: "flex", gap: "10px", marginTop: "18px" }}>
+              <button onClick={generate} disabled={loading} style={generateButton}>
+                {loading ? "Generating..." : "Generate QA Output"}
+              </button>
+
+              <button onClick={clearAll} style={clearButton}>
+                Clear
+              </button>
+            </div>
           </section>
 
           <section style={cardLight}>
@@ -366,13 +440,13 @@ npx playwright test --debug
 
                 {type === "playwright" || type === "api-automation" ? (
                   <>
-                    <button onClick={downloadAutomationCode} style={smallButton}>Download Code</button>
-                    <button onClick={downloadInstructions} style={smallButton}>Instructions</button>
+                    {isPro && <button onClick={downloadAutomationCode} style={smallButton}>Download Code</button>}
+                    {isPro && <button onClick={downloadInstructions} style={smallButton}>Instructions</button>}
                     <button onClick={downloadTxt} style={smallButton}>TXT</button>
                   </>
                 ) : (
                   <>
-                    {tableData.length > 0 && (
+                    {isPro && tableData.length > 0 && (
                       <>
                         <button onClick={downloadExcel} style={smallButton}>Excel</button>
                         <button onClick={downloadPdf} style={smallButton}>PDF</button>
@@ -417,11 +491,12 @@ npx playwright test --debug
             <div style={priceCard}>
               <h3>Free</h3>
               <p style={price}>$0</p>
-              <p>For students and quick testing.</p>
+              <p>For quick testing.</p>
               <ul>
-                <li>Manual test case generation</li>
-                <li>Limited usage</li>
+                <li>3 generations/day</li>
+                <li>Text-only manual/API test cases</li>
                 <li>TXT export</li>
+                <li>No screenshots</li>
               </ul>
             </div>
 
@@ -430,6 +505,7 @@ npx playwright test --debug
               <p style={price}>$9/month</p>
               <p>For QA engineers and freelancers.</p>
               <ul>
+                <li>50 generations/day</li>
                 <li>Excel and PDF export</li>
                 <li>Screenshot-based test cases</li>
                 <li>Playwright UI automation</li>
@@ -448,7 +524,7 @@ npx playwright test --debug
   );
 }
 
-const mainStyle = {
+const mainStyle: CSSProperties = {
   minHeight: "100vh",
   background: "linear-gradient(135deg, #020617, #0f172a)",
   color: "white",
@@ -456,22 +532,18 @@ const mainStyle = {
   fontFamily: "Arial, sans-serif",
 };
 
-const headerStyle = {
+const headerStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
   marginBottom: "36px",
-  flexWrap: "wrap" as const,
+  flexWrap: "wrap",
   gap: "16px",
 };
 
-const brandWrap = {
-  display: "flex",
-  alignItems: "center",
-  gap: "12px",
-};
+const brandWrap: CSSProperties = { display: "flex", alignItems: "center", gap: "12px" };
 
-const logoStyle = {
+const logoStyle: CSSProperties = {
   width: "46px",
   height: "46px",
   borderRadius: "14px",
@@ -484,17 +556,16 @@ const logoStyle = {
   fontSize: "24px",
 };
 
-const brandName = {
-  fontWeight: "bold",
-  fontSize: "22px",
+const brandName: CSSProperties = { fontWeight: "bold", fontSize: "22px" };
+const tagline: CSSProperties = { color: "#94a3b8", fontSize: "14px" };
+
+const authArea: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
 };
 
-const tagline = {
-  color: "#94a3b8",
-  fontSize: "14px",
-};
-
-const badgeStyle = {
+const badgeStyle: CSSProperties = {
   background: "#1e293b",
   color: "#86efac",
   padding: "10px 14px",
@@ -502,7 +573,17 @@ const badgeStyle = {
   fontSize: "14px",
 };
 
-const heroStyle = {
+const signInButton: CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "10px",
+  border: "none",
+  background: "#22c55e",
+  color: "white",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
+
+const heroStyle: CSSProperties = {
   background: "linear-gradient(135deg, #111827, #1e293b)",
   border: "1px solid #334155",
   borderRadius: "24px",
@@ -510,28 +591,28 @@ const heroStyle = {
   marginBottom: "28px",
 };
 
-const heroTitle = {
+const heroTitle: CSSProperties = {
   fontSize: "44px",
   lineHeight: "1.1",
   maxWidth: "850px",
   margin: 0,
 };
 
-const heroText = {
+const heroText: CSSProperties = {
   color: "#cbd5e1",
   fontSize: "18px",
   maxWidth: "850px",
 };
 
-const heroBullets = {
+const heroBullets: CSSProperties = {
   display: "flex",
   gap: "12px",
-  flexWrap: "wrap" as const,
+  flexWrap: "wrap",
   color: "#bbf7d0",
   fontWeight: "bold",
 };
 
-const howItWorks = {
+const howItWorks: CSSProperties = {
   background: "#0b1220",
   border: "1px solid #334155",
   borderRadius: "20px",
@@ -539,13 +620,13 @@ const howItWorks = {
   marginBottom: "28px",
 };
 
-const stepsGrid = {
+const stepsGrid: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, 1fr)",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "14px",
 };
 
-const stepCard = {
+const stepCard: CSSProperties = {
   background: "#111827",
   border: "1px solid #334155",
   borderRadius: "16px",
@@ -553,27 +634,27 @@ const stepCard = {
   color: "#cbd5e1",
 };
 
-const gridStyle = {
+const gridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
+  gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
   gap: "24px",
 };
 
-const cardDark = {
+const cardDark: CSSProperties = {
   background: "#111827",
   border: "1px solid #334155",
   borderRadius: "20px",
   padding: "24px",
 };
 
-const cardLight = {
+const cardLight: CSSProperties = {
   background: "#ffffff",
   color: "#0f172a",
   borderRadius: "20px",
   padding: "24px",
 };
 
-const tabButton = {
+const tabButton: CSSProperties = {
   padding: "12px 16px",
   borderRadius: "12px",
   border: "1px solid #334155",
@@ -581,7 +662,7 @@ const tabButton = {
   fontWeight: "bold",
 };
 
-const textareaStyle = {
+const textareaStyle: CSSProperties = {
   width: "100%",
   height: "170px",
   padding: "16px",
@@ -590,10 +671,10 @@ const textareaStyle = {
   color: "white",
   border: "1px solid #334155",
   fontSize: "16px",
-  boxSizing: "border-box" as const,
+  boxSizing: "border-box",
 };
 
-const uploadBox = {
+const uploadBox: CSSProperties = {
   marginTop: "18px",
   border: "1px dashed #475569",
   borderRadius: "14px",
@@ -601,7 +682,7 @@ const uploadBox = {
   background: "#020617",
 };
 
-const uploadButton = {
+const uploadButton: CSSProperties = {
   display: "inline-block",
   marginTop: "10px",
   padding: "12px 18px",
@@ -612,23 +693,23 @@ const uploadButton = {
   fontWeight: "bold",
 };
 
-const imageGrid = {
+const imageGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(5, 1fr)",
   gap: "10px",
   marginTop: "12px",
 };
 
-const previewImage = {
+const previewImage: CSSProperties = {
   width: "100%",
   height: "85px",
-  objectFit: "cover" as const,
+  objectFit: "cover",
   borderRadius: "10px",
   border: "1px solid #334155",
 };
 
-const removeButton = {
-  position: "absolute" as const,
+const removeButton: CSSProperties = {
+  position: "absolute",
   top: "-8px",
   right: "-8px",
   width: "24px",
@@ -640,9 +721,8 @@ const removeButton = {
   cursor: "pointer",
 };
 
-const generateButton = {
-  marginTop: "18px",
-  width: "100%",
+const generateButton: CSSProperties = {
+  flex: 1,
   padding: "16px",
   borderRadius: "14px",
   border: "none",
@@ -653,7 +733,17 @@ const generateButton = {
   cursor: "pointer",
 };
 
-const smallButton = {
+const clearButton: CSSProperties = {
+  padding: "16px 22px",
+  borderRadius: "14px",
+  border: "none",
+  background: "#475569",
+  color: "white",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
+
+const smallButton: CSSProperties = {
   padding: "10px 14px",
   borderRadius: "10px",
   border: "none",
@@ -663,16 +753,16 @@ const smallButton = {
   cursor: "pointer",
 };
 
-const outputBox = {
+const outputBox: CSSProperties = {
   maxHeight: "600px",
   overflow: "auto",
   border: "1px solid #e2e8f0",
   borderRadius: "14px",
 };
 
-const preStyle = {
+const preStyle: CSSProperties = {
   padding: "18px",
-  whiteSpace: "pre-wrap" as const,
+  whiteSpace: "pre-wrap",
   minHeight: "420px",
   margin: 0,
   color: "#334155",
@@ -680,21 +770,21 @@ const preStyle = {
   lineHeight: "1.6",
 };
 
-const th = {
-  textAlign: "left" as const,
+const th: CSSProperties = {
+  textAlign: "left",
   padding: "12px",
   borderBottom: "1px solid #e2e8f0",
   fontSize: "13px",
 };
 
-const td = {
+const td: CSSProperties = {
   padding: "12px",
   borderBottom: "1px solid #e2e8f0",
-  verticalAlign: "top" as const,
+  verticalAlign: "top",
   fontSize: "13px",
 };
 
-const pricingSection = {
+const pricingSection: CSSProperties = {
   marginTop: "30px",
   background: "#0b1220",
   border: "1px solid #334155",
@@ -702,13 +792,13 @@ const pricingSection = {
   padding: "24px",
 };
 
-const pricingGrid = {
+const pricingGrid: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
   gap: "18px",
 };
 
-const priceCard = {
+const priceCard: CSSProperties = {
   background: "#111827",
   border: "1px solid #334155",
   borderRadius: "18px",
@@ -716,18 +806,18 @@ const priceCard = {
   color: "#cbd5e1",
 };
 
-const price = {
+const price: CSSProperties = {
   fontSize: "30px",
   color: "white",
   fontWeight: "bold",
 };
 
-const footerStyle = {
+const footerStyle: CSSProperties = {
   marginTop: "28px",
   padding: "20px 0",
   color: "#94a3b8",
   display: "flex",
   justifyContent: "space-between",
   gap: "12px",
-  flexWrap: "wrap" as const,
+  flexWrap: "wrap",
 };

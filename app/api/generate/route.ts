@@ -1,19 +1,29 @@
 import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { auth } from "@clerk/nextjs/server";
 
 export async function POST(req: Request) {
   try {
-    const { type, input, images } = await req.json();
+    const { userId } = await auth();
 
-    if (!process.env.OPENAI_API_KEY) {
+    if (!userId) {
       return Response.json(
-        { error: "OPENAI_API_KEY missing in .env.local" },
+        { error: "Please sign in to generate QA output." },
+        { status: 401 }
+      );
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      return Response.json(
+        { error: "OPENAI_API_KEY is missing." },
         { status: 500 }
       );
     }
+
+    const openai = new OpenAI({ apiKey });
+
+    const { type, input, images } = await req.json();
 
     const imageContent: any[] =
       images?.map((img: string) => ({
@@ -23,88 +33,86 @@ export async function POST(req: Request) {
 
     let prompt = "";
 
-    if (type === "api") {
+    if (type === "manual") {
+      prompt = `
+You are a Senior QA Architect with 15+ years of QA experience.
+
+Generate HIGH-QUALITY manual test cases for:
+${input || "Analyze uploaded screenshots and generate test cases."}
+
+If screenshots are provided:
+- Analyze visible fields, buttons, labels, flows, validations, navigation, errors, and UI behavior.
+
+Return ONLY valid JSON object:
+{
+  "testCases": [
+    {
+      "id": "TC001",
+      "title": "",
+      "preconditions": "",
+      "steps": "",
+      "expected": "",
+      "priority": "High"
+    }
+  ]
+}
+
+Rules:
+- Generate 8 to 15 strong test cases.
+- Cover positive, negative, edge, validation, UI, usability, accessibility, and security scenarios.
+- Steps must be clear and numbered inside one string.
+- Avoid duplicate or generic cases.
+`;
+    } else if (type === "api") {
       prompt = `
 You are a Senior API QA Engineer.
 
-Generate API test cases for this feature/API:
+Generate HIGH-QUALITY API test cases for:
 ${input}
 
-Return ONLY a valid JSON array.
-Do NOT include markdown.
-Do NOT include explanation.
-Do NOT include backticks.
-
-Use exactly this structure:
-[
-  {
-    "id": "API_TC001",
-    "title": "Verify successful API request",
-    "method": "POST",
-    "endpoint": "/api/example",
-    "requestData": "Valid request payload",
-    "steps": "1. Prepare valid request data. 2. Send request. 3. Verify response.",
-    "expected": "API should return successful response.",
-    "statusCode": "200",
-    "priority": "High"
-  }
-]
+Return ONLY valid JSON object:
+{
+  "testCases": [
+    {
+      "id": "API_TC001",
+      "title": "",
+      "method": "",
+      "endpoint": "",
+      "requestData": "",
+      "steps": "",
+      "expected": "",
+      "statusCode": "",
+      "priority": "High"
+    }
+  ]
+}
 
 Rules:
-- Generate 8 to 12 API test cases.
-- Include success, invalid input, missing fields, auth, boundary, security, duplicate request, and error handling.
-- If exact endpoint is not provided, write "To be updated".
-`;
-    } else if (type === "manual") {
-      prompt = `
-You are a Senior QA Engineer.
-
-Generate manual test cases for:
-${input || "Analyze uploaded screenshots and generate manual test cases."}
-
-Return ONLY a valid JSON array.
-Do NOT include markdown.
-Do NOT include explanation.
-Do NOT include backticks.
-
-Use exactly this structure:
-[
-  {
-    "id": "TC001",
-    "title": "Verify valid user flow",
-    "preconditions": "User is on the relevant screen.",
-    "steps": "1. Open the screen. 2. Enter valid data. 3. Submit.",
-    "expected": "System should complete the action successfully.",
-    "priority": "High"
-  }
-]
-
-Rules:
-- Generate 8 to 12 useful test cases.
-- Include positive, negative, edge, UI, validation, usability, and accessibility cases.
+- Generate 8 to 15 API test cases.
+- Cover success, validation, missing fields, invalid payload, auth, token expiry, security, boundary, duplicate request, and error handling.
+- If endpoint/method is missing, write "To be updated".
 `;
     } else if (type === "playwright") {
       prompt = `
-You are a Senior QA Automation Engineer.
+You are a Senior Playwright Automation Engineer.
 
 Generate ONLY valid Playwright TypeScript UI automation code.
 
 Input:
-${input || "Analyze uploaded screenshots and generate Playwright UI tests."}
+${input || "Analyze uploaded screenshots and generate UI automation."}
 
 Rules:
-- Return ONLY code.
-- No markdown.
-- No explanation.
+- Return ONLY code. No markdown. No explanation.
 - Use: import { test, expect } from '@playwright/test';
 - Use: const BASE_URL = process.env.BASE_URL || 'https://example.com';
-- Generate 3 to 6 tests.
-- Use getByRole, getByLabel, getByPlaceholder, getByText.
+- Generate 3 to 6 useful UI tests.
+- Use getByRole, getByLabel, getByPlaceholder, getByText where possible.
 - Add comments where selectors may need adjustment.
+- Include meaningful assertions.
 `;
     } else if (type === "api-automation") {
       prompt = `
-You are a Senior QA Automation Engineer.
+You are a Senior API Automation Engineer.
 
 Generate ONLY valid Playwright TypeScript API automation code.
 
@@ -112,15 +120,15 @@ Input:
 ${input}
 
 Rules:
-- Return ONLY code.
-- No markdown.
-- No explanation.
+- Return ONLY code. No markdown. No explanation.
 - Use: import { test, expect } from '@playwright/test';
 - Use: const BASE_URL = process.env.BASE_URL || 'https://example.com';
-- Generate 3 to 6 API tests.
-- Include positive and negative API scenarios.
-- Add comments where endpoint, token, or payload must be updated.
+- Generate 3 to 6 API automation tests.
+- Include positive and negative cases.
+- Add comments where endpoint, auth token, payload, or expected response should be updated.
 `;
+    } else {
+      return Response.json({ error: "Invalid generation type." }, { status: 400 });
     }
 
     const response = await openai.chat.completions.create({
@@ -142,24 +150,13 @@ Rules:
 
     if (type === "manual" || type === "api") {
       const parsed = JSON.parse(result);
-
-      if (Array.isArray(parsed)) {
-        result = JSON.stringify(parsed);
-      } else if (Array.isArray(parsed.testCases)) {
-        result = JSON.stringify(parsed.testCases);
-      } else if (Array.isArray(parsed.test_cases)) {
-        result = JSON.stringify(parsed.test_cases);
-      } else if (Array.isArray(parsed.cases)) {
-        result = JSON.stringify(parsed.cases);
-      } else {
-        result = JSON.stringify([parsed]);
-      }
+      result = JSON.stringify(parsed.testCases || []);
     }
 
     return Response.json({ result });
   } catch (error: any) {
     return Response.json(
-      { error: error.message || "API error" },
+      { error: error.message || "Something went wrong." },
       { status: 500 }
     );
   }
