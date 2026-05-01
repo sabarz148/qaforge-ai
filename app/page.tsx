@@ -146,7 +146,7 @@ export default function Home() {
 
     try {
       setLoading(true);
-      setOutput("Generating...");
+      setOutput("⚡ Generating high-quality QA output... this may take 10–25 seconds.");
       setTableData([]);
 
       const res = await fetch("/api/generate", {
