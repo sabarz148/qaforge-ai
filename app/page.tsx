@@ -37,7 +37,9 @@ export default function Home() {
     if (typeof window === "undefined") return;
     localStorage.setItem(todayKey(), String(getUsage() + 1));
   }
-
+  function handleUpgrade() {
+  alert("Pro upgrade is coming soon.");
+  }
   function clearAll() {
     setInput("");
     setImages([]);
@@ -307,6 +309,10 @@ npx playwright test --debug
               {isSignedIn ? `${isPro ? "Pro" : "Free"} Plan • ${isPro ? "50" : "3"} daily generations` : "Sign in to start"}
             </div>
 
+            <button onClick={handleUpgrade} style={upgradeButton}>
+            🚀 Upgrade to Pro
+            </button>
+
             {isSignedIn ? (
               <UserButton />
             ) : (
@@ -493,11 +499,12 @@ npx playwright test --debug
               <p style={price}>$0</p>
               <p>For quick testing.</p>
               <ul>
-                <li>3 generations/day</li>
-                <li>Text-only manual/API test cases</li>
-                <li>TXT export</li>
-                <li>No screenshots</li>
+                  <li>3 generations/day</li>
+                  <li>Manual + API test cases</li>
+                  <li>TXT export</li>
+                  <li>No screenshots or automation</li>
               </ul>
+              
             </div>
 
             <div style={{ ...priceCard, border: "2px solid #22c55e" }}>
@@ -506,10 +513,10 @@ npx playwright test --debug
               <p>For QA engineers and freelancers.</p>
               <ul>
                 <li>50 generations/day</li>
-                <li>Excel and PDF export</li>
                 <li>Screenshot-based test cases</li>
                 <li>Playwright UI automation</li>
                 <li>API automation code</li>
+                <li>Excel + PDF export</li>
               </ul>
             </div>
           </div>
@@ -820,4 +827,14 @@ const footerStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: "12px",
   flexWrap: "wrap",
+};
+
+const upgradeButton: CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "10px",
+  border: "none",
+  background: "#f59e0b",
+  color: "white",
+  fontWeight: "bold",
+  cursor: "pointer",
 };
