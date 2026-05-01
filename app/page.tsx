@@ -46,7 +46,11 @@ export default function Home() {
     setOutput("");
     setTableData([]);
   }
-
+  function handleUpgrade() {
+  alert("Payments are under review. Pro upgrade will be available soon.");
+  // Later replace this with LemonSqueezy link:
+  // window.open("https://your-lemonsqueezy-checkout-link", "_blank");
+  }
   async function resizeImage(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -309,9 +313,9 @@ npx playwright test --debug
               {isSignedIn ? `${isPro ? "Pro" : "Free"} Plan • ${isPro ? "50" : "3"} daily generations` : "Sign in to start"}
             </div>
 
-            <button onClick={handleUpgrade} style={upgradeButton}>
+             <button onClick={handleUpgrade} style={signInButton}>
             🚀 Upgrade to Pro
-            </button>
+             </button>
 
             {isSignedIn ? (
               <UserButton />
@@ -326,7 +330,7 @@ npx playwright test --debug
         <section style={heroStyle}>
           <h1 style={heroTitle}>Generate QA test cases and automation in minutes.</h1>
           <p style={heroText}>
-            Create manual test cases, API test cases, Playwright UI automation, and API automation from feature text or app screenshots.
+          Generate high-quality manual test cases, API test cases, and Playwright automation in seconds — not hours.
           </p>
 
           <div style={heroBullets}>
@@ -350,6 +354,9 @@ npx playwright test --debug
         <div style={gridStyle}>
           <section style={cardDark}>
             <h2 style={{ marginTop: 0 }}>Create QA Output</h2>
+            <p style={{ color: "#94a3b8", marginTop: "-8px" }}>
+            ⚡ Get practical QA coverage from feature text, API details, or screenshots.
+            </p>
 
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "18px" }}>
               {tabs.map(([value, label]) => (
