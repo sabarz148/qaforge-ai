@@ -37,9 +37,7 @@ export default function Home() {
     if (typeof window === "undefined") return;
     localStorage.setItem(todayKey(), String(getUsage() + 1));
   }
-  function handleUpgrade() {
-  alert("Pro upgrade is coming soon.");
-  }
+  
   function clearAll() {
     setInput("");
     setImages([]);
