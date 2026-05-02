@@ -20,6 +20,8 @@ export default function Home() {
   const [tableData, setTableData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [domain, setDomain] = useState("general");
+  const [feedback, setFeedback] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState("");
 
   const plan = (user?.publicMetadata?.plan as string) || "free";
   const isPro = plan === "pro" || plan === "premium";
@@ -50,6 +52,34 @@ export default function Home() {
   // Later replace this with LemonSqueezy link:
   // window.open("https://your-lemonsqueezy-checkout-link", "_blank");
   }
+  async function submitFeedback() {
+  if (!isSignedIn) {
+    setFeedbackStatus("Please sign in to submit feedback.");
+    return;
+  }
+
+  if (!feedback.trim()) {
+    setFeedbackStatus("Please write feedback first.");
+    return;
+  }
+
+  const res = await fetch("/api/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: feedback }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    setFeedbackStatus(data.error || "Feedback submission failed.");
+    return;
+  }
+
+  setFeedback("");
+  setFeedbackStatus("Thank you! Your feedback has been submitted.");
+} 
+
   async function resizeImage(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -527,24 +557,53 @@ npx playwright test --debug
                 <pre style={preStyle}>{output || "Generated output will appear here..."}</pre>
               )}
             </div>
+
+            
           </section>
         </div>
 
-        <section style={pricingSection}>
-          <h2 style={{ marginTop: 0 }}>Simple pricing</h2>
-          <div style={pricingGrid}>
-            <div style={priceCard}>
-              <h3>Free</h3>
-              <p style={price}>$0</p>
-              <p>For quick testing.</p>
-              <ul>
-                  <li>3 generations/day</li>
-                  <li>Manual + API test cases</li>
-                  <li>TXT export</li>
-                  <li>No screenshots or automation</li>
-              </ul>
-              
-            </div>
+        
+              <section style={feedbackSection}>
+                <h2 style={{ marginTop: 0 }}>Help us improve QAForge AI</h2>
+                <p style={{ color: "#94a3b8", fontSize: "15px" }}>
+                  Share what worked, what felt confusing, or what feature you want next.
+                </p>
+
+                <textarea
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  placeholder="Write your feedback here..."
+                  style={feedbackTextarea}
+                />
+
+                <button onClick={submitFeedback} style={smallButton}>
+                  Submit Feedback
+                </button>
+
+                {feedbackStatus && (
+                  <p style={{ color: "#86efac", fontWeight: "bold" }}>
+                    {feedbackStatus}
+                  </p>
+                )}
+              </section>
+
+          <section style={pricingSection}></section>
+
+                  <section style={pricingSection}>
+                    <h2 style={{ marginTop: 0 }}>Simple pricing</h2>
+                    <div style={pricingGrid}>
+                      <div style={priceCard}>
+                        <h3>Free</h3>
+                        <p style={price}>$0</p>
+                        <p>For quick testing.</p>
+                        <ul>
+                            <li>3 generations/day</li>
+                            <li>Manual + API test cases</li>
+                            <li>TXT export</li>
+                            <li>No screenshots or automation</li>
+                        </ul>
+                        
+                      </div>
 
             <div style={{ ...priceCard, border: "2px solid #22c55e" }}>
               <h3>Pro</h3>
@@ -876,4 +935,32 @@ const upgradeButton: CSSProperties = {
   color: "white",
   fontWeight: "bold",
   cursor: "pointer",
+};
+
+const feedbackBox: CSSProperties = {
+  marginTop: "18px",
+  padding: "16px",
+  borderRadius: "14px",
+  border: "1px solid #e2e8f0",
+  background: "#f8fafc",
+};
+
+const feedbackTextarea: CSSProperties = {
+  width: "100%",
+  minHeight: "90px",
+  padding: "12px",
+  borderRadius: "12px",
+  border: "1px solid #cbd5e1",
+  color: "#0f172a",
+  fontSize: "14px",
+  boxSizing: "border-box",
+  marginBottom: "10px",
+};
+
+const feedbackSection: CSSProperties = {
+  marginTop: "30px",
+  background: "#0b1220",
+  border: "1px solid #334155",
+  borderRadius: "20px",
+  padding: "24px",
 };

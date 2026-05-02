@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.2.8",
+    "@supabase/supabase-js": "^2.105.1",
     "jspdf": "^4.2.1",
     "next": "16.2.4",
     "openai": "^6.34.0",
