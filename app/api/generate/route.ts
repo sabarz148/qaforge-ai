@@ -314,6 +314,14 @@ Rules:
       result = JSON.stringify(parsed.testCases || []);
     }
 
+    console.log("QA_GENERATED", {
+    type,
+    user: userId || "anonymous",
+    time: new Date().toISOString(),
+    });
+
+return Response.json({ result });
+
     return Response.json({ result });
   } catch (error: any) {
     if (error.name === "AbortError") {
@@ -323,6 +331,7 @@ Rules:
       );
     }
 
+       
     return Response.json(
       { error: error.message || "Something went wrong." },
       { status: 500 }
