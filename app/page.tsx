@@ -19,6 +19,7 @@ export default function Home() {
   const [output, setOutput] = useState("");
   const [tableData, setTableData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [domain, setDomain] = useState("general");
 
   const plan = (user?.publicMetadata?.plan as string) || "free";
   const isPro = plan === "pro" || plan === "premium";
@@ -154,7 +155,13 @@ export default function Home() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, input, images: images.map((img) => img.dataUrl) }),
+        body: JSON.stringify({
+          type,
+          input,
+          domain,
+          images: images.map((img) => img.dataUrl),
+        }),
+        
       });
 
       const data = await res.json();
@@ -376,6 +383,33 @@ npx playwright test --debug
                   {!isPro && (value === "playwright" || value === "api-automation") ? " 🔒" : ""}
                 </button>
               ))}
+            </div>
+
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", color: "#94a3b8", marginBottom: "6px" }}>
+                Select domain
+              </label>
+
+              <select
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  background: "#020617",
+                  color: "white",
+                  border: "1px solid #334155",
+                  fontSize: "15px",
+                }}
+              >
+                <option value="general">General Software</option>
+                <option value="healthcare">Healthcare</option>
+                <option value="fintech">Fintech</option>
+                <option value="ecommerce">E-commerce</option>
+                <option value="saas">SaaS</option>
+                <option value="education">Education</option>
+              </select>
             </div>
 
             <textarea

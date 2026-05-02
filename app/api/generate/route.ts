@@ -1,6 +1,38 @@
 import OpenAI from "openai";
 import { auth, currentUser } from "@clerk/nextjs/server";
 
+function isWeakInput(input: string, images?: string[]) {
+  const cleaned = (input || "").trim();
+
+  if (images && images.length > 0) return false;
+
+  if (!cleaned) return true;
+  if (cleaned.length < 20) return true;
+
+  const weakWords = ["test", "login", "app", "website", "api", "screen"];
+  if (weakWords.includes(cleaned.toLowerCase())) return true;
+
+  return false;
+}
+
+function domainGuidance(domain: string) {
+  const map: Record<string, string> = {
+    general: "Use general software QA best practices.",
+    healthcare:
+      "Include healthcare QA risks: patient data privacy, PHI handling, HIPAA-style privacy checks, audit trail, role-based access, data integrity, consent, and secure access.",
+    fintech:
+      "Include fintech QA risks: transaction accuracy, duplicate payments, fraud scenarios, authorization, audit logs, concurrency, limits, rounding, chargebacks, and security.",
+    ecommerce:
+      "Include e-commerce QA risks: cart, checkout, discounts, inventory, payment failure, order confirmation, refunds, taxes, shipping, and abandoned cart.",
+    saas:
+      "Include SaaS QA risks: multi-tenant access, roles/permissions, subscription limits, onboarding, dashboards, notifications, integrations, and data isolation.",
+    education:
+      "Include education QA risks: student/teacher roles, enrollment, assignments, grading, progress tracking, content access, and parent/student privacy.",
+  };
+
+  return map[domain] || map.general;
+}
+
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
@@ -27,7 +59,7 @@ export async function POST(req: Request) {
     const plan = (user?.publicMetadata?.plan as string) || "free";
     const isPro = plan === "pro" || plan === "premium";
 
-    const { type, input, images } = await req.json();
+    const { type, input, images, domain = "general" } = await req.json();
 
     if (!isPro && images?.length > 0) {
       return Response.json(
@@ -43,7 +75,25 @@ export async function POST(req: Request) {
       );
     }
 
-    const maxCases = isPro ? "8" : "5";
+    if ((type === "manual" || type === "api") && isWeakInput(input, images)) {
+      return Response.json({
+        result: JSON.stringify([
+          {
+            id: "INPUT_CHECK",
+            title: "Input needs more detail",
+            preconditions: "User provided unclear or incomplete input.",
+            steps:
+              "1. Describe one feature or flow clearly. 2. Include user actions, fields, validations, and expected behavior. 3. Try again.",
+            expected:
+              "Example: Login page with email, password, forgot password, OTP verification, invalid password error, and locked account handling.",
+            priority: "High",
+            coverageArea: "Input Quality",
+            testType: "Clarification",
+            riskLevel: "High",
+          },
+        ]),
+      });
+    }
 
     const imageContent: any[] =
       images?.map((img: string) => ({
@@ -51,25 +101,46 @@ export async function POST(req: Request) {
         image_url: { url: img },
       })) || [];
 
+    const domainRules = domainGuidance(domain);
+
     let prompt = "";
 
     if (type === "manual") {
       prompt = `
-You are a senior QA engineer.
+You are a Senior QA Architect with 15+ years of experience.
 
-Create exactly ${maxCases} practical manual test cases.
+Your task is to generate adaptive, domain-aware, QA-ready manual test cases.
+
+Domain selected: ${domain}
+Domain guidance: ${domainRules}
 
 Input:
-${input || "Analyze uploaded screenshots and create QA test cases."}
+${input || "Analyze uploaded screenshots and generate QA test cases."}
 
-Focus on:
-- main happy path
-- negative cases
-- validation
-- edge case
-- usability/accessibility where relevant
+First silently analyze:
+- Is the input a real feature/flow?
+- Complexity: small, medium, or complex
+- Number of flows
+- Main risks
+- Required coverage areas
 
-Return ONLY valid JSON:
+Generate test cases according to complexity:
+- Small feature: 5–8 test cases
+- Medium feature: 8–15 test cases
+- Complex/multi-flow: 15–25 test cases
+But avoid repetition.
+
+Coverage required:
+- Functional happy path
+- Negative scenarios
+- Validation
+- Edge cases
+- Security/privacy where relevant
+- Usability
+- Accessibility basics
+- Domain-specific risks
+
+Return ONLY valid JSON object:
 {
   "testCases": [
     {
@@ -78,34 +149,59 @@ Return ONLY valid JSON:
       "preconditions": "",
       "steps": "1. ... 2. ... 3. ...",
       "expected": "",
-      "priority": "High"
+      "priority": "High",
+      "coverageArea": "Functional / Validation / Security / Usability / Accessibility / Edge Case",
+      "testType": "Positive / Negative / Edge / Security / UI / Accessibility",
+      "riskLevel": "High / Medium / Low"
     }
   ]
 }
 
 Rules:
-- Be concise but useful.
+- Be specific to the user's input.
+- Do not generate generic checklist items.
+- Each test case must be unique.
+- Steps must be actionable.
+- Expected result must be clear.
 - No markdown.
-- No explanation.
-- No duplicate cases.
+- No explanation outside JSON.
 `;
     } else if (type === "api") {
       prompt = `
-You are a senior API QA engineer.
+You are a Senior API QA Architect.
 
-Create exactly ${maxCases} API test cases.
+Generate adaptive, domain-aware API test cases.
+
+Domain selected: ${domain}
+Domain guidance: ${domainRules}
 
 Input:
 ${input}
 
-Focus on:
-- success response
-- validation errors
-- auth/token issue
-- missing/invalid fields
-- edge/security case
+First silently analyze:
+- Endpoint/method/payload if provided
+- Auth requirements
+- Validation rules
+- Business risks
+- Complexity
 
-Return ONLY valid JSON:
+Generate test cases according to complexity:
+- Small API: 5–8 test cases
+- Medium API: 8–15 test cases
+- Complex API: 15–25 test cases
+
+Coverage required:
+- Successful request
+- Missing fields
+- Invalid data types
+- Invalid/expired token
+- Unauthorized access
+- Boundary values
+- Duplicate request/idempotency
+- Rate limit/security
+- Domain-specific risks
+
+Return ONLY valid JSON object:
 {
   "testCases": [
     {
@@ -117,19 +213,28 @@ Return ONLY valid JSON:
       "steps": "1. ... 2. ... 3. ...",
       "expected": "",
       "statusCode": "",
-      "priority": "High"
+      "priority": "High",
+      "coverageArea": "Functional / Validation / Auth / Security / Edge Case",
+      "testType": "Positive / Negative / Security / Boundary",
+      "riskLevel": "High / Medium / Low"
     }
   ]
 }
 
 Rules:
-- If method/endpoint is unknown, use "To be updated".
+- If method/endpoint is missing, use "To be updated".
+- Do not create vague test cases.
 - No markdown.
-- No explanation.
+- No explanation outside JSON.
 `;
     } else if (type === "playwright") {
       prompt = `
-Generate concise Playwright TypeScript UI automation.
+You are a Senior Playwright Automation Engineer.
+
+Generate concise, realistic Playwright TypeScript UI automation.
+
+Domain selected: ${domain}
+Domain guidance: ${domainRules}
 
 Input:
 ${input || "Analyze screenshots and create UI automation."}
@@ -139,13 +244,20 @@ Return ONLY code.
 Rules:
 - Use: import { test, expect } from '@playwright/test';
 - Use: const BASE_URL = process.env.BASE_URL || 'https://example.com';
-- Generate 3 useful tests only.
+- Generate 3–6 useful tests depending on complexity.
 - Prefer getByRole, getByLabel, getByPlaceholder, getByText.
-- Add short comments where selectors need adjustment.
+- Add comments where selectors may need adjustment.
+- Include meaningful assertions.
+- Avoid fake data-testid unless user provided it.
 `;
     } else if (type === "api-automation") {
       prompt = `
-Generate concise Playwright TypeScript API automation.
+You are a Senior Playwright API Automation Engineer.
+
+Generate concise, realistic Playwright TypeScript API automation.
+
+Domain selected: ${domain}
+Domain guidance: ${domainRules}
 
 Input:
 ${input}
@@ -155,16 +267,17 @@ Return ONLY code.
 Rules:
 - Use: import { test, expect } from '@playwright/test';
 - Use: const BASE_URL = process.env.BASE_URL || 'https://example.com';
-- Generate 3 useful API tests only.
+- Generate 3–6 API tests depending on complexity.
 - Include positive and negative cases.
-- Add comments where auth token, endpoint, or payload must be updated.
+- Add comments where auth token, endpoint, payload, or expected response must be updated.
+- Include assertions for status code and key response fields.
 `;
     } else {
       return Response.json({ error: "Invalid generation type." }, { status: 400 });
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
 
     const response = await openai.chat.completions.create(
       {
@@ -176,7 +289,7 @@ Rules:
           },
         ],
         temperature: 0,
-        max_tokens: type === "manual" || type === "api" ? 1200 : 1400,
+        max_tokens: type === "manual" || type === "api" ? 2200 : 1600,
         response_format:
           type === "manual" || type === "api"
             ? { type: "json_object" }
@@ -205,7 +318,7 @@ Rules:
   } catch (error: any) {
     if (error.name === "AbortError") {
       return Response.json(
-        { error: "Request timed out. Please try again with shorter input." },
+        { error: "Request timed out. Try shorter input or one feature at a time." },
         { status: 408 }
       );
     }
