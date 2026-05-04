@@ -25,6 +25,7 @@ export default function Home() {
 
   const plan = (user?.publicMetadata?.plan as string) || "free";
   const isPro = plan === "pro" || plan === "premium";
+  const [showHelp, setShowHelp] = useState(false);
 
   function todayKey() {
     const today = new Date().toISOString().slice(0, 10);
@@ -332,6 +333,7 @@ npx playwright test --debug
   ];
 
   return (
+
     <main style={mainStyle}>
       <div style={{ maxWidth: "1250px", margin: "0 auto" }}>
         <header style={headerStyle}>
@@ -363,18 +365,23 @@ npx playwright test --debug
         </header>
 
         <section style={heroStyle}>
-          <h1 style={heroTitle}>Generate QA test cases and automation in minutes.</h1>
-          <p style={heroText}>
-          Generate high-quality manual test cases, API test cases, and Playwright automation in seconds — not hours.
-          </p>
+  <h1 style={heroTitle}>
+    Generate QA test cases and automation in minutes.
+  </h1>
 
-          <div style={heroBullets}>
-            <span>✓ Excel / PDF export</span>
-            <span>✓ Screenshot analysis</span>
-            <span>✓ Playwright code</span>
-            <span>✓ API test coverage</span>
-          </div>
-        </section>
+  <p style={heroText}>
+    Generate high-quality manual test cases, API test cases, and Playwright automation in seconds — not hours.
+  </p>
+
+  <div style={heroBullets}>
+    <span>✓ Excel / PDF export</span>
+    <span>✓ Screenshot analysis</span>
+    <span>✓ Playwright code</span>
+    <span>✓ API test coverage</span>
+  </div>
+</section>
+
+        
 
         <section style={howItWorks}>
           <h2 style={{ marginTop: 0 }}>How it works</h2>
@@ -455,7 +462,12 @@ npx playwright test --debug
                   : "Example: Login page with email, password, remember me, forgot password, OTP"
               }
               style={textareaStyle}
+             
             />
+
+            <button onClick={() => setShowHelp(true)} style={smallButton}>
+             View Example
+            </button>
 
             <div style={uploadBox}>
               <h3 style={{ marginTop: 0 }}>Upload app screenshots {isPro ? "" : "🔒"}</h3>
@@ -625,6 +637,71 @@ npx playwright test --debug
           <div>Manual QA • API QA • Playwright Automation • Screenshot Analysis</div>
         </footer>
       </div>
+      {showHelp && (
+  <div style={modalOverlay}>
+    <div style={modalBox}>
+      <h2 style={{ marginTop: 0 }}>Example Output</h2>
+
+  <div style={exampleCard}>
+    <div style={exampleLabel}>INPUT</div>
+    <div style={exampleInput}>
+      Login with email, password, forgot password
+    </div>
+  </div>
+
+  <div style={exampleCard}>
+    <div style={exampleLabel}>GENERATED TEST CASES</div>
+
+    <pre style={examplePre}>
+{`P0 - Valid login
+P1 - Invalid password
+P1 - Forgot password flow
+
+Steps:
+1. Enter valid email
+2. Enter valid password
+3. Click login
+
+Expected:
+User is successfully logged in
+
+Edge Cases:
+- SQL injection attempt
+- Special characters in password
+- Session timeout`}
+    </pre>
+  </div>
+
+  <button onClick={() => setShowHelp(false)} style={smallButton}>
+    Close
+  </button>
+</div>
+
+      <pre style={examplePre}>
+{`P0 - Valid login
+P1 - Invalid password
+P1 - Forgot password flow
+
+Steps:
+1. Enter valid email
+2. Enter valid password
+3. Click login
+
+Expected:
+User is successfully logged in
+
+Edge Cases:
+- SQL injection attempt
+- Special characters in password
+- Session timeout`}
+      </pre>
+
+      <button onClick={() => setShowHelp(false)} style={smallButton}>
+        Close
+      </button>
+    </div>
+  
+)}
     </main>
   );
 }
@@ -963,4 +1040,65 @@ const feedbackSection: CSSProperties = {
   border: "1px solid #334155",
   borderRadius: "20px",
   padding: "24px",
+};
+
+const exampleSection: CSSProperties = {
+  marginTop: "30px",
+  background: "#020617",
+  border: "1px solid #334155",
+  borderRadius: "20px",
+  padding: "24px",
+};
+
+const exampleBox: CSSProperties = {
+  marginTop: "12px",
+  background: "#020617",
+  border: "1px solid #1e293b",
+  padding: "16px",
+  borderRadius: "12px",
+};
+
+
+const modalOverlay: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.65)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 9999,
+};
+
+const modalBox: CSSProperties = {
+  background: "white",
+  color: "#0f172a",
+  width: "90%",
+  maxWidth: "650px",
+  borderRadius: "18px",
+  padding: "24px",
+};
+
+const exampleCard: CSSProperties = {
+  marginTop: "16px",
+  padding: "16px",
+  borderRadius: "12px",
+  background: "#f1f5f9",
+};
+
+const exampleLabel: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: "bold",
+  color: "#64748b",
+  marginBottom: "6px",
+};
+
+const exampleInput: CSSProperties = {
+  fontWeight: "500",
+  color: "#0f172a",
+};
+
+const examplePre: CSSProperties = {
+  whiteSpace: "pre-wrap",
+  fontSize: "13px",
+  color: "#0f172a",
 };
