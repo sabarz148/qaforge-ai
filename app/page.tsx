@@ -27,6 +27,23 @@ export default function Home() {
   const isPro = plan === "pro" || plan === "premium";
   const [showHelp, setShowHelp] = useState(false);
 
+   async function trackEvent(eventName: string, metadata: any = {}) {
+    try {
+      await fetch("/api/track", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          event_name: eventName,
+          metadata,
+        }),
+      });
+    } catch {
+      // ignore errors
+    }
+  }
+
   function todayKey() {
     const today = new Date().toISOString().slice(0, 10);
     return `qaforge_usage_${user?.id || "guest"}_${today}`;
@@ -54,6 +71,9 @@ export default function Home() {
   // window.open("https://your-lemonsqueezy-checkout-link", "_blank");
   }
   async function submitFeedback() {
+    trackEvent("FEEDBACK_SUBMITTED", {
+  feedback_length: feedback.length,
+    });
   if (!isSignedIn) {
     setFeedbackStatus("Please sign in to submit feedback.");
     return;
@@ -153,6 +173,16 @@ export default function Home() {
   }
 
   async function generate() {
+
+    trackEvent("GENERATE_CLICK", {
+    type,
+    domain,
+    input_length: input.length,
+    image_count: images.length,
+    is_signed_in: isSignedIn,
+    plan,
+    });
+
     if (!isSignedIn) {
       setOutput("Please sign in to generate QA output.");
       return;
@@ -176,6 +206,8 @@ export default function Home() {
     if (!input.trim() && images.length === 0) {
       setOutput("Please enter details or upload screenshots.");
       return;
+
+      
     }
 
     try {
@@ -239,6 +271,13 @@ export default function Home() {
   }
 
   function downloadExcel() {
+
+    trackEvent("EXPORT_CLICK", {
+      format: "excel",
+      type,
+      rows: tableData.length,
+    });
+
     if (!tableData.length) return;
 
     const worksheet = XLSX.utils.json_to_sheet(tableData);
@@ -250,6 +289,13 @@ export default function Home() {
   }
 
   function downloadPdf() {
+
+    trackEvent("EXPORT_CLICK", {
+      format: "pdf",
+      type,
+      rows: tableData.length,
+    });
+
     if (!tableData.length) return;
 
     const doc = new jsPDF();
@@ -280,10 +326,18 @@ export default function Home() {
   }
 
   function downloadTxt() {
+    trackEvent("EXPORT_CLICK", {
+    format: "txt",
+    type,
+    });
     downloadFile(output, "qa-output.txt", "text/plain");
   }
 
   function downloadAutomationCode() {
+    trackEvent("EXPORT_CLICK", {
+    format: "playwright_code",
+    type,
+    });
     const filename = type === "api-automation" ? "api-automation.spec.ts" : "ui-automation.spec.ts";
     downloadFile(output, filename, "text/plain");
   }
@@ -1028,7 +1082,7 @@ const feedbackTextarea: CSSProperties = {
   padding: "12px",
   borderRadius: "12px",
   border: "1px solid #cbd5e1",
-  color: "#0f172a",
+  color: "#b5b6b8",
   fontSize: "14px",
   boxSizing: "border-box",
   marginBottom: "10px",
