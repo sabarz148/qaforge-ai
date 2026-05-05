@@ -25,6 +25,7 @@ export default function Home() {
 
   const plan = (user?.publicMetadata?.plan as string) || "free";
   const isPro = plan === "pro" || plan === "premium";
+  
   const [showHelp, setShowHelp] = useState(false);
 
    async function trackEvent(eventName: string, metadata: any = {}) {
@@ -689,6 +690,9 @@ npx playwright test --debug
         <footer style={footerStyle}>
           <div>© 2026 QAForge AI. Built for faster software testing.</div>
           <div>Manual QA • API QA • Playwright Automation • Screenshot Analysis</div>
+          <a href="/terms" style={{ color: "#94a3b8" }}>
+  Terms & Conditions
+</a>
         </footer>
       </div>
       {showHelp && (
