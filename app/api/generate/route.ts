@@ -144,15 +144,15 @@ Return ONLY valid JSON object:
 {
   "testCases": [
     {
-      "id": "TC001",
-      "title": "",
-      "preconditions": "",
-      "steps": "1. ... 2. ... 3. ...",
-      "expected": "",
-      "priority": "High",
-      "coverageArea": "Functional / Validation / Security / Usability / Accessibility / Edge Case",
-      "testType": "Positive / Negative / Edge / Security / UI / Accessibility",
-      "riskLevel": "High / Medium / Low"
+      "Id": "TC001",
+      "Title": "",
+      "Preconditions": "",
+      "Steps": "1. ... 2. ... 3. ...",
+      "Expected": "",
+      "Priority": "High",
+      "CoverageArea": "Functional / Validation / Security / Usability / Accessibility / Edge Case",
+      "TestType": "Positive / Negative / Edge / Security / UI / Accessibility",
+      "RiskLevel": "High / Medium / Low"
     }
   ]
 }
@@ -205,18 +205,18 @@ Return ONLY valid JSON object:
 {
   "testCases": [
     {
-      "id": "API_TC001",
-      "title": "",
-      "method": "",
-      "endpoint": "",
-      "requestData": "",
-      "steps": "1. ... 2. ... 3. ...",
-      "expected": "",
-      "statusCode": "",
-      "priority": "High",
-      "coverageArea": "Functional / Validation / Auth / Security / Edge Case",
-      "testType": "Positive / Negative / Security / Boundary",
-      "riskLevel": "High / Medium / Low"
+      "Id": "API_TC001",
+      "Title": "",
+      "Method": "",
+      "Endpoint": "",
+      "RequestData": "",
+      "Steps": "1. ... 2. ... 3. ...",
+      "Expected": "",
+      "StatusCode": "",
+      "Priority": "High",
+      "CoverageArea": "Functional / Validation / Auth / Security / Edge Case",
+      "TestType": "Positive / Negative / Security / Boundary",
+      "RiskLevel": "High / Medium / Low"
     }
   ]
 }
